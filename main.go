@@ -4,9 +4,13 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"time"
 )
 
 const (
@@ -26,17 +30,48 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	urlHostCounter := make(map[string]int)
 	for _, url := range urls {
-		err := saveResponse(destinationPath, url)
+		err := saveResponse(destinationPath, url, urlHostCounter)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 		}
 	}
 }
 
-func saveResponse(destinationPath string, url *url.URL) error {
-	fmt.Printf("Сохранение ответа в %s от %s\n", destinationPath, url)
+func saveResponse(destinationPath string, url *url.URL, urlHostCounter map[string]int) error {
+	response, err := http.Get(url.String())
+	if err != nil {
+		return fmt.Errorf("server is not responding URL: \"%s\" Error: %s", url, err)
+	}
+	defer response.Body.Close()
 
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("server status code: \"%s\" URL: \"%s\"", response.Status, url)
+	}
+
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	if err := saveResponseData(destinationPath, url, urlHostCounter, data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func saveResponseData(destinationPath string, url *url.URL, urlHostCounter map[string]int, data []byte) error {
+	now := time.Now().Format("2006-01-02_15-04-05")
+	fileName := fmt.Sprintf("%s_%d_%s", url.Host, urlHostCounter[url.Host]+1, now)
+	filePath := filepath.Join(destinationPath, fileName)
+	err := os.WriteFile(filePath, data, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	urlHostCounter[url.Host]++
 	return nil
 }
 
