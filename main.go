@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 )
 
 const (
@@ -34,11 +36,29 @@ func saveResponse(destinationPath string, url *url.URL) error {
 	return nil
 }
 
-func readUrlsFromFile(sourcePath string) (urls []*url.URL, err error) {
-	fmt.Printf("Считывание из  %s\n", sourcePath)
-	testUrl, _ := url.Parse("https://pkg.go.dev/net/url")
-	urls = []*url.URL{testUrl}
-	return
+func readUrlsFromFile(sourcePath string) ([]*url.URL, error) {
+	file, err := os.Open(sourcePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var urls []*url.URL
+	var urlCustom *url.URL
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		urlCustom, err = url.Parse(scanner.Text())
+		if err != nil {
+			fmt.Printf("Invalid url:'%s'\n", scanner.Text())
+			continue
+		}
+		urls = append(urls, urlCustom)
+	}
+	if err = scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return urls, nil
 }
 
 func parseFlags() (sourcePath string, destinationPath string) {
