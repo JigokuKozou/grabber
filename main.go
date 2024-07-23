@@ -42,17 +42,17 @@ func main() {
 func saveResponse(destinationPath string, url *url.URL, urlHostCounter map[string]int) error {
 	response, err := http.Get(url.String())
 	if err != nil {
-		return fmt.Errorf("server is not responding URL: \"%s\" Error: %s", url, err)
+		return fmt.Errorf("сервер не отвечает URL: \"%s\" Ошибка: %s", url, err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("server status code: \"%s\" URL: \"%s\"", response.Status, url)
+		return fmt.Errorf("статус код ответа: \"%s\" URL: \"%s\"", response.Status, url)
 	}
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("ошибка чтения тела ответа URL:\"%s\" Ошибка: %s", url, err)
 	}
 
 	if err := saveResponseData(destinationPath, url, urlHostCounter, data); err != nil {
@@ -68,7 +68,7 @@ func saveResponseData(destinationPath string, url *url.URL, urlHostCounter map[s
 	filePath := filepath.Join(destinationPath, fileName)
 	err := os.WriteFile(filePath, data, os.ModePerm)
 	if err != nil {
-		return err
+		return fmt.Errorf("ошибка записи данных тела ответа \"%s\" в файл \"%s\" Ошибка: %s", url, filePath, err)
 	}
 
 	urlHostCounter[url.Host]++
@@ -78,7 +78,7 @@ func saveResponseData(destinationPath string, url *url.URL, urlHostCounter map[s
 func readUrlsFromFile(sourcePath string) ([]*url.URL, error) {
 	file, err := os.Open(sourcePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ошибка открытия файла \"%s\" Ошибка: %s", sourcePath, err)
 	}
 	defer file.Close()
 
@@ -88,7 +88,7 @@ func readUrlsFromFile(sourcePath string) ([]*url.URL, error) {
 	for scanner.Scan() {
 		urlCustom, err = url.Parse(scanner.Text())
 		if err != nil {
-			fmt.Printf("Invalid url:'%s'\n", scanner.Text())
+			fmt.Printf("Не корректный URL:'%s'\n", scanner.Text())
 			continue
 		}
 		urls = append(urls, urlCustom)
@@ -102,15 +102,17 @@ func readUrlsFromFile(sourcePath string) ([]*url.URL, error) {
 
 func createDirectory(path string) error {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		return err
+		return fmt.Errorf("ошибка создания папки сохранения ответов по пути: \"%s\" Ошибка: \"%s\"", path, err)
 	}
 	return nil
 }
 
-func parseFlags() (sourcePath string, destinationPath string) {
-	flag.StringVar(&sourcePath, "src", defaultSourcePath, "Path to file with urls")
-	flag.StringVar(&destinationPath, "dst", defaultDestinationPath, "Path to received responses")
+func parseFlags() (string, string) {
+	var sourcePath string
+	var destinationPath string
+	flag.StringVar(&sourcePath, "src", defaultSourcePath, "Путь до файла с URL адресами")
+	flag.StringVar(&destinationPath, "dst", defaultDestinationPath, "Путь до папки сохранения ответов")
 
 	flag.Parse()
-	return
+	return sourcePath, destinationPath
 }
