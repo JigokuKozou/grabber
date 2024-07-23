@@ -17,6 +17,10 @@ const (
 func main() {
 	sourcePath, destinationPath := parseFlags()
 
+	if err := createDirectory(destinationPath); err != nil {
+		log.Fatalln(err)
+	}
+
 	urls, err := readUrlsFromFile(sourcePath)
 	if err != nil {
 		log.Fatalln(err)
@@ -59,6 +63,13 @@ func readUrlsFromFile(sourcePath string) ([]*url.URL, error) {
 	}
 
 	return urls, nil
+}
+
+func createDirectory(path string) error {
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+		return err
+	}
+	return nil
 }
 
 func parseFlags() (sourcePath string, destinationPath string) {
