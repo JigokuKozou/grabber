@@ -16,15 +16,19 @@ import (
 	"github.com/beevik/guid"
 )
 
-const (
-	defaultSourcePath      = "urls.txt"
-	defaultDestinationPath = "responses"
-)
-
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Fatalf("Произошла паника: %v", r)
+		}
+	}()
+
 	start := time.Now()
 
-	sourcePath, destinationPath := parseFlags()
+	sourcePath, destinationPath, err := parseFlags()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	if err := createDirectory(destinationPath); err != nil {
 		log.Fatalln(err)
@@ -90,7 +94,7 @@ func saveResponseData(destinationPath string, url *url.URL, body []byte) error {
 	if err != nil {
 		return fmt.Errorf("ошибка записи тела ответа в файл [url=%s, filePath=%s]: %w", url, filePath, err)
 	}
-	fmt.Printf("Ответ с сервера \"%s\" успешно записан в файл %s", url, filePath)
+	fmt.Printf("Ответ с сервера \"%s\" успешно записан в файл %s\n", url, filePath)
 
 	return nil
 }
@@ -139,17 +143,19 @@ func createDirectory(path string) error {
 }
 
 // parseFlags - разбор флагов командной строки для получения путей к файлу с URL и папке для сохранения ответов
-func parseFlags() (string, string) {
+func parseFlags() (string, string, error) {
 	var sourcePath string
 	var destinationPath string
-	flag.StringVar(&sourcePath, "src", defaultSourcePath, "Путь до файла с URL адресами")
-	flag.StringVar(&destinationPath, "dst", defaultDestinationPath, "Путь до папки сохранения ответов")
+	flag.StringVar(&sourcePath, "src", "", "Путь до файла с URL адресами")
+	flag.StringVar(&destinationPath, "dst", "", "Путь до папки сохранения ответов")
 
 	flag.Parse()
 
-	if sourcePath == defaultSourcePath && destinationPath == defaultDestinationPath {
+	if sourcePath == "" || destinationPath == "" {
 		flag.Usage()
+		return "", "", fmt.Errorf("не указан один из флагов [sourcePath=%s, destinationPath=%s]",
+			sourcePath, destinationPath)
 	}
 
-	return sourcePath, destinationPath
+	return sourcePath, destinationPath, nil
 }
