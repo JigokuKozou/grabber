@@ -37,7 +37,7 @@ func main() {
 
 	saveResponses(destinationPath, urls)
 
-	fmt.Printf("Время выполнения: %s\n", time.Since(start))
+	fmt.Printf("Время выполнения: %.2f секунд\n", time.Since(start).Seconds())
 }
 
 func saveResponses(destinationPath string, urls []*url.URL) {
