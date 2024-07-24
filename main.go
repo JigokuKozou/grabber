@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/beevik/guid"
 )
 
 const (
@@ -39,26 +41,25 @@ func main() {
 }
 
 func saveResponses(destinationPath string, urls []*url.URL) {
-	hostVisits := make(map[string]int)
-	var hostVisitsMx sync.RWMutex
-
 	var wg sync.WaitGroup
 	wg.Add(len(urls))
+
 	for _, urlSite := range urls {
-		go func(destinationPath string, urlSite *url.URL, hostVisits map[string]int, hostVisitsMx *sync.RWMutex) {
+		go func(destinationPath string, urlSite *url.URL) {
 			defer wg.Done()
 
-			err := saveResponse(destinationPath, urlSite, hostVisits, hostVisitsMx)
+			err := saveResponse(destinationPath, urlSite)
 			if err != nil {
 				log.Println(err)
 			}
-		}(destinationPath, urlSite, hostVisits, &hostVisitsMx)
+		}(destinationPath, urlSite)
 	}
+
 	wg.Wait()
 }
 
 // saveResponse - сохранение тела ответа от сервера по указанному URL
-func saveResponse(destinationPath string, url *url.URL, hostVisits map[string]int, hostVisitsMx *sync.RWMutex) error {
+func saveResponse(destinationPath string, url *url.URL) error {
 	response, err := http.Get(url.String())
 	if err != nil {
 		return fmt.Errorf("сервер не отвечает [url=%s]: %w", url, err)
@@ -74,7 +75,7 @@ func saveResponse(destinationPath string, url *url.URL, hostVisits map[string]in
 		return fmt.Errorf("ошибка чтения тела ответа [url=%s]: %w", url, err)
 	}
 
-	if err := saveResponseData(destinationPath, url, responseBodyBytes, hostVisits, hostVisitsMx); err != nil {
+	if err := saveResponseData(destinationPath, url, responseBodyBytes); err != nil {
 		return err
 	}
 
@@ -82,28 +83,20 @@ func saveResponse(destinationPath string, url *url.URL, hostVisits map[string]in
 }
 
 // saveResponseData - сохранение данных тела ответа в файл
-func saveResponseData(destinationPath string, url *url.URL, bytes []byte, hostVisits map[string]int, hostVisitsMx *sync.RWMutex) error {
-	hostVisitsMx.RLock()
-	filePath := generateFilePath(destinationPath, url.Host, hostVisits[url.Host]+1)
-	hostVisitsMx.RUnlock()
+func saveResponseData(destinationPath string, url *url.URL, body []byte) error {
+	filePath := generateFilePath(destinationPath, url.Host)
 
-	err := os.WriteFile(filePath, bytes, os.ModePerm)
+	err := os.WriteFile(filePath, body, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("ошибка записи данных тела ответа в файл [url=%s, filePath=%s]: %w", url, filePath, err)
 	}
-
-	// Увеличение счетчика запросов к хосту
-	hostVisitsMx.Lock()
-	hostVisits[url.Host]++
-	hostVisitsMx.Unlock()
 
 	return nil
 }
 
 // generateFilePath - формирует именя файла с учетом текущего времени и количества запросов к хосту
-func generateFilePath(destinationPath string, urlHost string, countVisits int) string {
-	now := time.Now().Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("%s_%d_%s", urlHost, countVisits, now)
+func generateFilePath(destinationPath string, urlHost string) string {
+	fileName := fmt.Sprintf("%s_%s", urlHost, guid.New())
 	filePath := filepath.Join(destinationPath, fileName)
 
 	return filePath
