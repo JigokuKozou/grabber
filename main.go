@@ -70,13 +70,13 @@ func saveResponse(destinationPath string, url *url.URL) error {
 		return fmt.Errorf("не удалось выполнить запрос [status_code=%s, url=%s]", response.Status, url)
 	}
 
-	responseBodyBytes, err := io.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return fmt.Errorf("ошибка чтения тела ответа [url=%s]: %w", url, err)
 	}
 
-	if err := saveResponseData(destinationPath, url, responseBodyBytes); err != nil {
-		return err
+	if err := saveResponseData(destinationPath, url, responseBody); err != nil {
+		return fmt.Errorf("ошибка сохранения тела ответа [url=%s, destinationPath=%s]: %w", url, destinationPath, err)
 	}
 
 	return nil
@@ -88,8 +88,9 @@ func saveResponseData(destinationPath string, url *url.URL, body []byte) error {
 
 	err := os.WriteFile(filePath, body, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("ошибка записи данных тела ответа в файл [url=%s, filePath=%s]: %w", url, filePath, err)
+		return fmt.Errorf("ошибка записи тела ответа в файл [url=%s, filePath=%s]: %w", url, filePath, err)
 	}
+	fmt.Printf("Ответ с сервера \"%s\" успешно записан в файл %s", url, filePath)
 
 	return nil
 }
