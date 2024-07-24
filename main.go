@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -32,19 +33,32 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	hostVisitCount := make(map[string]int)
-	for _, url := range urls {
-		err := saveResponse(destinationPath, url, hostVisitCount)
-		if err != nil {
-			log.Println(err)
-		}
-	}
+	saveResponses(destinationPath, urls)
 
 	fmt.Printf("Время выполнения: %s\n", time.Since(start))
 }
 
+func saveResponses(destinationPath string, urls []*url.URL) {
+	hostVisits := make(map[string]int)
+	var hostVisitsMx sync.RWMutex
+
+	var wg sync.WaitGroup
+	wg.Add(len(urls))
+	for _, urlSite := range urls {
+		go func(destinationPath string, urlSite *url.URL, hostVisits map[string]int, hostVisitsMx *sync.RWMutex) {
+			defer wg.Done()
+
+			err := saveResponse(destinationPath, urlSite, hostVisits, hostVisitsMx)
+			if err != nil {
+				log.Println(err)
+			}
+		}(destinationPath, urlSite, hostVisits, &hostVisitsMx)
+	}
+	wg.Wait()
+}
+
 // saveResponse - сохранение тела ответа от сервера по указанному URL
-func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[string]int) error {
+func saveResponse(destinationPath string, url *url.URL, hostVisits map[string]int, hostVisitsMx *sync.RWMutex) error {
 	response, err := http.Get(url.String())
 	if err != nil {
 		return fmt.Errorf("сервер не отвечает [url=%s]: %w", url, err)
@@ -60,7 +74,7 @@ func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[strin
 		return fmt.Errorf("ошибка чтения тела ответа [url=%s]: %w", url, err)
 	}
 
-	if err := saveResponseData(destinationPath, url, responseBodyBytes, hostVisitCount); err != nil {
+	if err := saveResponseData(destinationPath, url, responseBodyBytes, hostVisits, hostVisitsMx); err != nil {
 		return err
 	}
 
@@ -68,19 +82,31 @@ func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[strin
 }
 
 // saveResponseData - сохранение данных тела ответа в файл
-func saveResponseData(destinationPath string, url *url.URL, bytes []byte, hostVisitCount map[string]int) error {
-	// Формирование имени файла с учетом текущего времени и количества запросов к хосту
-	now := time.Now().Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("%s_%d_%s", url.Host, hostVisitCount[url.Host]+1, now)
-	filePath := filepath.Join(destinationPath, fileName)
+func saveResponseData(destinationPath string, url *url.URL, bytes []byte, hostVisits map[string]int, hostVisitsMx *sync.RWMutex) error {
+	hostVisitsMx.RLock()
+	filePath := generateFilePath(destinationPath, url.Host, hostVisits[url.Host]+1)
+	hostVisitsMx.RUnlock()
+
 	err := os.WriteFile(filePath, bytes, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("ошибка записи данных тела ответа в файл [url=%s, filePath=%s]: %w", url, filePath, err)
 	}
 
 	// Увеличение счетчика запросов к хосту
-	hostVisitCount[url.Host]++
+	hostVisitsMx.Lock()
+	hostVisits[url.Host]++
+	hostVisitsMx.Unlock()
+
 	return nil
+}
+
+// generateFilePath - формирует именя файла с учетом текущего времени и количества запросов к хосту
+func generateFilePath(destinationPath string, urlHost string, countVisits int) string {
+	now := time.Now().Format("2006-01-02_15-04-05")
+	fileName := fmt.Sprintf("%s_%d_%s", urlHost, countVisits, now)
+	filePath := filepath.Join(destinationPath, fileName)
+
+	return filePath
 }
 
 // readUrlsFromFile - чтение слайса указателей на URL из файла
