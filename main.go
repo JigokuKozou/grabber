@@ -140,5 +140,10 @@ func parseFlags() (string, string) {
 	flag.StringVar(&destinationPath, "dst", defaultDestinationPath, "Путь до папки сохранения ответов")
 
 	flag.Parse()
+
+	if sourcePath == defaultSourcePath && destinationPath == defaultDestinationPath {
+		flag.Usage()
+	}
+
 	return sourcePath, destinationPath
 }
