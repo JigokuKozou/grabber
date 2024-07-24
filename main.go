@@ -19,6 +19,8 @@ const (
 )
 
 func main() {
+	start := time.Now()
+
 	sourcePath, destinationPath := parseFlags()
 
 	if err := createDirectory(destinationPath); err != nil {
@@ -37,6 +39,8 @@ func main() {
 			log.Println(err)
 		}
 	}
+
+	fmt.Printf("Время выполнения: %s\n", time.Since(start))
 }
 
 // saveResponse - сохранение тела ответа от сервера по указанному URL
