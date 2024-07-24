@@ -115,7 +115,6 @@ func createDirectory(path string) error {
 }
 
 // parseFlags - разбор флагов командной строки для получения путей к файлу с URL и папке для сохранения ответов
-
 func parseFlags() (string, string) {
 	var sourcePath string
 	var destinationPath string
