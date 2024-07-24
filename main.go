@@ -57,17 +57,17 @@ func main() {
 func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[string]int, mx *sync.RWMutex) error {
 	response, err := http.Get(url.String())
 	if err != nil {
-		return fmt.Errorf("сервер не отвечает URL: \"%s\" Ошибка: %s", url, err)
+		return fmt.Errorf("сервер не отвечает [url=%s]: %w", url, err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("статус код ответа: \"%s\" URL: \"%s\"", response.Status, url)
+		return fmt.Errorf("не удалось выполнить запрос [status_code=%s, url=%s]", response.Status, url)
 	}
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("ошибка чтения тела ответа URL:\"%s\" Ошибка: %s", url, err)
+		return fmt.Errorf("ошибка чтения тела ответа [url=%s]: %w", url, err)
 	}
 
 	if err := saveResponseData(destinationPath, url, data, hostVisitCount, mx); err != nil {
@@ -87,7 +87,7 @@ func saveResponseData(destinationPath string, url *url.URL, data []byte, hostVis
 	filePath := filepath.Join(destinationPath, fileName)
 	err := os.WriteFile(filePath, data, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("ошибка записи данных тела ответа \"%s\" в файл \"%s\" Ошибка: %s", url, filePath, err)
+		return fmt.Errorf("ошибка записи данных тела ответа в файл [url=%s, filePath=%s]: %w", url, filePath, err)
 	}
 
 	// Увеличение счетчика запросов к хосту
@@ -101,7 +101,7 @@ func saveResponseData(destinationPath string, url *url.URL, data []byte, hostVis
 func readUrlsFromFile(sourcePath string) ([]*url.URL, error) {
 	file, err := os.Open(sourcePath)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка открытия файла \"%s\" Ошибка: %s", sourcePath, err)
+		return nil, fmt.Errorf("ошибка открытия файла [sourcePath=%s]: %w", sourcePath, err)
 	}
 	defer file.Close()
 
@@ -127,7 +127,7 @@ func readUrlsFromFile(sourcePath string) ([]*url.URL, error) {
 // createDirectory - создание директории для сохранения ответов
 func createDirectory(path string) error {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		return fmt.Errorf("ошибка создания папки сохранения ответов по пути: \"%s\" Ошибка: \"%s\"", path, err)
+		return fmt.Errorf("ошибка создания папки сохранения ответов [path=%s]: %w", path, err)
 	}
 	return nil
 }
