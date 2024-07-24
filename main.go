@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
@@ -34,27 +33,18 @@ func main() {
 	}
 
 	hostVisitCount := make(map[string]int)
-	var mx sync.RWMutex
-
-	var wg sync.WaitGroup
-	wg.Add(len(urls))
 	for _, url := range urls {
-		go func() {
-			defer wg.Done()
-
-			err := saveResponse(destinationPath, url, hostVisitCount, &mx)
-			if err != nil {
-				log.Println(err)
-			}
-		}()
+		err := saveResponse(destinationPath, url, hostVisitCount)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
-	wg.Wait()
 	fmt.Printf("Время выполнения: %s\n", time.Since(start))
 }
 
 // saveResponse - сохранение тела ответа от сервера по указанному URL
-func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[string]int, mx *sync.RWMutex) error {
+func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[string]int) error {
 	response, err := http.Get(url.String())
 	if err != nil {
 		return fmt.Errorf("сервер не отвечает [url=%s]: %w", url, err)
@@ -70,7 +60,7 @@ func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[strin
 		return fmt.Errorf("ошибка чтения тела ответа [url=%s]: %w", url, err)
 	}
 
-	if err := saveResponseData(destinationPath, url, responseBodyBytes, hostVisitCount, mx); err != nil {
+	if err := saveResponseData(destinationPath, url, responseBodyBytes, hostVisitCount); err != nil {
 		return err
 	}
 
@@ -78,12 +68,10 @@ func saveResponse(destinationPath string, url *url.URL, hostVisitCount map[strin
 }
 
 // saveResponseData - сохранение данных тела ответа в файл
-func saveResponseData(destinationPath string, url *url.URL, bytes []byte, hostVisitCount map[string]int, mx *sync.RWMutex) error {
+func saveResponseData(destinationPath string, url *url.URL, bytes []byte, hostVisitCount map[string]int) error {
 	// Формирование имени файла с учетом текущего времени и количества запросов к хосту
 	now := time.Now().Format("2006-01-02_15-04-05")
-	mx.RLock()
 	fileName := fmt.Sprintf("%s_%d_%s", url.Host, hostVisitCount[url.Host]+1, now)
-	mx.RUnlock()
 	filePath := filepath.Join(destinationPath, fileName)
 	err := os.WriteFile(filePath, bytes, os.ModePerm)
 	if err != nil {
@@ -91,9 +79,7 @@ func saveResponseData(destinationPath string, url *url.URL, bytes []byte, hostVi
 	}
 
 	// Увеличение счетчика запросов к хосту
-	mx.Lock()
 	hostVisitCount[url.Host]++
-	mx.Unlock()
 	return nil
 }
 
